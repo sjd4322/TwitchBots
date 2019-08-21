@@ -3,3 +3,4 @@ envVariables.json
 mongoConnection.json
 twitchApiAuth.json
 spotifySettings.json
+node_modules/
