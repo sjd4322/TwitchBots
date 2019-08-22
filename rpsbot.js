@@ -42,6 +42,7 @@ client.connect();
 
 client.on('message', onMessageHandler);
 client.on('connected', onConnectedHandler);
+client.on('whisper', onWhisperHandler);
 
 //Store the tokens for the application
 var access_token = "",
@@ -66,25 +67,22 @@ function onMessageHandler (target, context, msg, self) {
             });
         }else{
             client.say(target, context.username + ' input user you want to challenge! ex: !rps @Clavaat');
-        }
-        
+        }        
     }else
     if(commandName === "!yes" || commandName === "!no"){
         handleChallengeAnswer(target, context, msg);
     }else   
-    if (commandName === '!dice') {
-        const num = rollDice();
+    if (commandName.startsWith('!roll')) {
+        var splitString = commandName.split(" ");
+        const num = rollDice(parseInt(splitString[1]));
         client.say(target, `You rolled a ${num}`);
-    }else
-    if( commandName === "!poop"){
-        client.deletemessage(target, context.id);
     }else
     if(commandName === "!specs"){
         client.say(target, "CPU: i7 2600k - RAM: 16GB - GPU: GTX1070")
     }else
     if(commandName === "!related"){
         handleRelatedStreamers(target);
-    }
+    }else
     if(commandName === "!song"){
         $.ajax({
             url: 'https://api.spotify.com/v1/me/player/currently-playing',
@@ -104,16 +102,61 @@ function onMessageHandler (target, context, msg, self) {
                 console.log("Error: " + errorThrown); 
             }    
         });
+    }else
+    if(commandName.startsWith("!addSong")){
+        var splitCommand = commandName.split(" ");
+        var trackId = splitCommand[1].substring(31);
+        $.ajax({
+            url: 'https://api.spotify.com/v1/playlists/4cFU8IAMCISFDbtwJYiZX1/tracks?uris=spotify%3Atrack%3A' + trackId,
+            type: "POST",
+            headers: {
+                'Authorization': 'Bearer ' + access_token
+            },
+            success: function(spotifyInfo) {
+                client.say(target, context.username + "'s song successfully added!");               
+            },
+            error: function(XMLHttpRequest, textStatus, errorThrown) { 
+                client.say(target, "Something went wrong! " + context.username + "'s song not added!");     
+                console.log("Status: " + textStatus); 
+                console.log("Error: " + errorThrown); 
+            }    
+        });
     }
 };
 
-function rollDice () {
-    const sides = 6;
+function rollDice (sides) {
     return Math.floor(Math.random() * sides) + 1;
 }
 
 function onConnectedHandler () {
     console.log(`* Connected to Twitch, baby!`);
+}
+
+function onWhisperHandler(from, userstate, message, self){
+    const command = message.trim();  
+    if(command.startsWith("!rock") || command.startsWith("!paper") || command.startsWith("!scissor")){
+
+        var splitMsg = message.split(" ");
+        const connect = connection;
+        connect.then(() => {
+            var dbo = mongoClient.db("StevesBotDb").collection("Challenges");
+            dbo.findOne({ "gameId" : splitMsg[1] }, function (err, result){
+                if(result != null){
+                    const responseConnection = connection;
+                    responseConnection.then(() => {
+                        var dbo = mongoClient.db("StevesBotDb").collection("Challenges");
+
+                        if(from == result.challenged){
+                            dbo.update({"_id" : result._id}, {"challengedChoice" : splitMsg[0]})
+                        }else
+                        if(from == result.startedBy){
+                            dbo.update({"_id" : result._id}, {"startedByChoice" : splitMsg[0]})
+                        }
+                    })
+                }
+            });
+        });
+    }
 }
 
 function handleChallengeAnswer(target, context, msg){
@@ -126,13 +169,18 @@ function handleChallengeAnswer(target, context, msg){
                 responseConnection.then(() => {
                     var dbo = mongoClient.db("StevesBotDb").collection("Challenges");
                     if(msg === "!yes"){
-                        client.say(target, result.startedBy + ' has accepted your challenge! The match ID is: ' + result.gameId);
-                        dbo.update({"_id" : result._id}, {"gameId" : generateRandomString(4)})
+                        var gameId = generateRandomString(4);
+                        var test = result._id.toString();
+                        client.say(target, result.startedBy + ' has accepted your challenge! The match ID is: ' + gameId);
+                        dbo.updateOne({"_id" : result._id.toString()}, {$set: {"gameId" : gameId}})
+                        //client.whisper("ClavaatBot", "Respond with !rock, !paper, or !scissor followed by the match ID!");
                     }else{
                         dbo.remove({ "_id" : result._id});
                         client.say(target, result.startedBy + ' has declined your challenge!');
                     }    
-                })
+                }).catch(function(error){
+                    console.log(error);
+                });
             }else{
                 client.say(target, context.username + ' you have no open challenges.');
             }  
@@ -158,10 +206,13 @@ function handleRelatedStreamers(target){
                     var streamers = results.data.filter(streamer => streamer.viewer_count < 75);
 
                     var returnString = "Support fellow small streamers! Related channels: ";
-                    for(i=0; i < 5; i++){
-                        returnString += i != 4 ?
-                        "twitch.tv/" + streamers[i].user_name + ", " : 
-                        "twitch.tv/" + streamers[i].user_name;
+                    var numberOfStreamers = streamers.length < 5 ? streamers.length : 5; 
+                    for(i=0; i < numberOfStreamers; i++){
+                        if(streamers[i].user_name !== "Clavaat"){
+                            returnString += i != numberOfStreamers-2 ?
+                            "twitch.tv/" + streamers[i].user_name + ", " : 
+                            "twitch.tv/" + streamers[i].user_name;
+                        }
                     }
 
                     client.say(target, returnString);
@@ -180,7 +231,6 @@ function handleRelatedStreamers(target){
 }
 
 app.get('/login', function(req, res) {
-
     var state = generateRandomString(16);
     res.cookie(stateKey, state);
   
@@ -190,7 +240,7 @@ app.get('/login', function(req, res) {
             response_type: 'code',
             client_id: spotifyHeaders.client_id,
             redirect_uri: spotifyHeaders.redirect_uri,
-            scope: "user-read-currently-playing user-read-playback-state",
+            scope: "user-read-currently-playing user-read-playback-state playlist-modify-private playlist-read-private",
             state: state
     }));
 });
