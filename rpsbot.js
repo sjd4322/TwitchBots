@@ -61,7 +61,7 @@ function onMessageHandler (target, context, msg, self) {
             const connect = connection;
             connect.then(() => {
                 var dbo = mongoClient.db("StevesBotDb").collection("Challenges");
-                dbo.insert({ "startedBy" : context.username, "challenged" : challengedUser,
+                dbo.insertOne({ "startedBy" : context.username, "challenged" : challengedUser,
                             "startedByChoice" : "", "challengedChoice": "", "gameId" : "" });
                 client.say(target, challengedUser + ", do you accept " + context.username + "'s challenge? !yes or !no");    
             });
@@ -105,21 +105,53 @@ function onMessageHandler (target, context, msg, self) {
     }else
     if(commandName.startsWith("!addSong")){
         var splitCommand = commandName.split(" ");
-        var trackId = splitCommand[1].substring(31);
-        $.ajax({
-            url: 'https://api.spotify.com/v1/playlists/4cFU8IAMCISFDbtwJYiZX1/tracks?uris=spotify%3Atrack%3A' + trackId,
-            type: "POST",
-            headers: {
-                'Authorization': 'Bearer ' + access_token
-            },
-            success: function(spotifyInfo) {
-                client.say(target, context.username + "'s song successfully added!");               
-            },
-            error: function(XMLHttpRequest, textStatus, errorThrown) { 
-                client.say(target, "Something went wrong! " + context.username + "'s song not added!");     
-                console.log("Status: " + textStatus); 
-                console.log("Error: " + errorThrown); 
-            }    
+        if(splitCommand.length == 2){
+            var trackId = splitCommand[1].substring(31);
+            $.ajax({
+                url: "https://api.spotify.com/v1/playlists/4cFU8IAMCISFDbtwJYiZX1/tracks",
+                type: "GET",
+                headers: {
+                    'Authorization': 'Bearer ' + access_token
+                },
+                success: function(spotifyInfo) {
+                    var playlist = spotifyInfo.items.filter(x => x.track.id == trackId);
+                    if(playlist.length == 0){
+                        $.ajax({
+                            url: 'https://api.spotify.com/v1/playlists/4cFU8IAMCISFDbtwJYiZX1/tracks?uris=spotify%3Atrack%3A' + trackId,
+                            type: "POST",
+                            headers: {
+                                'Authorization': 'Bearer ' + access_token
+                            },
+                            success: function(spotifyInfo) {
+                                client.say(target, context.username + "'s song successfully added!");               
+                            },
+                            error: function(XMLHttpRequest, textStatus, errorThrown) { 
+                                client.say(target, "Something went wrong! " + context.username + "'s song not added!");     
+                                console.log("Status: " + textStatus); 
+                                console.log("Error: " + errorThrown); 
+                            }    
+                        });
+                    }else{
+                        client.say(target, context.username + "'s song is already on the list!");  
+                    }            
+                },
+                error: function(XMLHttpRequest, textStatus, errorThrown) { 
+                    client.say(target, "Something went wrong! " + context.username + "'s song not added!");     
+                    console.log("Status: " + textStatus); 
+                    console.log("Error: " + errorThrown); 
+                }   
+            });
+        }else{
+            client.say(target, context.username + " you forgot to include a link to the song!");   
+        }
+    }else
+    if(commandName.startsWith("!suggestion")){
+        var game = commandName.substr(commandName.indexOf(" ") + 1);
+        const connect = connection;
+        connect.then(() => {
+            var dbo = mongoClient.db("StevesBotDb").collection("Recommendations");
+            dbo.insertOne({ "game" : game, "suggestedBy" : context.username });
+            client.say(target, context.username + ", your game has been added to the list!");    
         });
     }
 };
@@ -170,7 +202,6 @@ function handleChallengeAnswer(target, context, msg){
                     var dbo = mongoClient.db("StevesBotDb").collection("Challenges");
                     if(msg === "!yes"){
                         var gameId = generateRandomString(4);
-                        var test = result._id.toString();
                         client.say(target, result.startedBy + ' has accepted your challenge! The match ID is: ' + gameId);
                         dbo.updateOne({"_id" : result._id.toString()}, {$set: {"gameId" : gameId}})
                         //client.whisper("ClavaatBot", "Respond with !rock, !paper, or !scissor followed by the match ID!");
