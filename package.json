@@ -1,0 +1,34 @@
+{
+  "name": "twitchbots",
+  "version": "1.0.0",
+  "description": "steve's twitch bot",
+  "main": "bot.js",
+  "dependencies": {
+    "cookie-parser": "^1.4.4",
+    "cors": "^2.8.5",
+    "express": "^4.17.1",
+    "jquery": "^3.4.1",
+    "jsdom": "^15.1.1",
+    "mongodb": "^3.3.2",
+    "querystring": "^0.2.0",
+    "request": "^2.88.0",
+    "tmi.js": "^1.5.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sjd4322/TwitchBots.git"
+  },
+  "keywords": [
+    "nodejs"
+  ],
+  "author": "Stephen Dunst",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sjd4322/TwitchBots/issues"
+  },
+  "homepage": "https://github.com/sjd4322/TwitchBots#readme"
+}
