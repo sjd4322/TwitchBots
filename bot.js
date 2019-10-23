@@ -265,7 +265,7 @@ function handleRelatedStreamers(target){
                         if(streamers[i].user_name !== "Clavaat"){
                             returnString += i != numberOfStreamers-2 ?
                             "twitch.tv/" + streamers[i].user_name + ", " : 
-                            "twitch.tv/" + streamers[i].user_name;
+                            " twitch.tv/" + streamers[i].user_name;
                         }
                     }
 
